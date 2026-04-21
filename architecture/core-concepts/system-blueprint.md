@@ -58,15 +58,15 @@ flowchart TB
 
     subgraph Perimeter ["🛡️ Edge & API Entry"]
         direction TB
-        Gateway[API Gateway<br/>(Rate Limit / Auth)]:::edge
-        BFF[GraphQL BFF<br/>(Data Stitching)]:::edge
+        Gateway["API Gateway<br/>(Rate Limit / Auth)"]:::edge
+        BFF["GraphQL BFF<br/>(Data Stitching)"]:::edge
         Gateway -->|REST| BFF
     end
 
     subgraph Services ["⚙️ Core Microservices"]
         direction TB
-        Identity[Identity & IAM Service]:::service
-        Ingestion[Data Ingestion Service]:::service
+        Identity["Identity & IAM Service"]:::service
+        Ingestion["Data Ingestion Service"]:::service
 
         Redis[(Redis Cache)]:::data
         DB_ID[(PostgreSQL)]:::data
@@ -79,13 +79,13 @@ flowchart TB
     end
 
     subgraph EventMesh ["⚡ Event-Driven Backbone"]
-        Kafka{{Kafka / RabbitMQ Broker}}:::broker
+        Kafka{{"Kafka / RabbitMQ Broker"}}:::broker
     end
 
     subgraph Intelligence ["🧠 AI Domain"]
         direction TB
-        FastAPI[AI Orchestrator<br/>(LangGraph)]:::ai
-        Vector[(Vector DB)]:::data
+        FastAPI["AI Orchestrator<br/>(LangGraph)"]:::ai
+        Vector[("Vector DB")]:::data
         FastAPI --- Vector
     end
 
