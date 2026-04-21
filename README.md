@@ -6,7 +6,75 @@ Welcome to the central Engineering Platform. This repository serves as the Inter
 
 ## 🗺️ High-Level Architecture
 
-_(Placeholder for Mermaid.js System Architecture Diagram)_
+```mermaid
+flowchart TB
+    %% Styling
+    classDef client fill:#ffffff,stroke:#333,stroke-width:2px;
+    classDef edge fill:#e0f7fa,stroke:#006064,stroke-width:2px;
+    classDef service fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px;
+    classDef data fill:#fff3e0,stroke:#e65100,stroke-width:1px;
+    classDef broker fill:#fce4ec,stroke:#880e4f,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef ai fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef ops fill:#eceff1,stroke:#455a64,stroke-width:2px,stroke-dasharray: 3 3;
+
+    Client([Next.js Web Client]):::client
+
+    subgraph Perimeter ["🛡️ Edge & API Entry"]
+        direction TB
+        Gateway[API Gateway<br/>(Rate Limit / Auth)]:::edge
+        BFF[GraphQL BFF<br/>(Data Stitching)]:::edge
+        Gateway -->|REST| BFF
+    end
+
+    subgraph Services ["⚙️ Core Microservices"]
+        direction TB
+        Identity[Identity & IAM Service]:::service
+        Ingestion[Data Ingestion Service]:::service
+
+        Redis[(Redis Cache)]:::data
+        DB_ID[(PostgreSQL)]:::data
+        DB_Ingest[(MongoDB)]:::data
+
+        Identity --- DB_ID
+        Ingestion --- DB_Ingest
+        BFF -.->|Cache Hit| Redis
+        Gateway -.->|Rate Limiting| Redis
+    end
+
+    subgraph EventMesh ["⚡ Event-Driven Backbone"]
+        Kafka{{Kafka / RabbitMQ Broker}}:::broker
+    end
+
+    subgraph Intelligence ["🧠 AI Domain"]
+        direction TB
+        FastAPI[AI Orchestrator<br/>(LangGraph)]:::ai
+        Vector[(Vector DB)]:::data
+        FastAPI --- Vector
+    end
+
+    subgraph Ops ["🔍 Observability & Alerting"]
+        Prometheus[Prometheus / OpenTelemetry]:::ops
+        Grafana[Grafana Dashboards]:::ops
+        Prometheus --- Grafana
+    end
+
+    %% Routing Flow
+    Client ==>|HTTPS / WAF| Gateway
+    BFF ==>|REST| Identity
+    BFF ==>|REST| Ingestion
+
+    %% Async Flow
+    Identity -.->|Publishes Event| Kafka
+    Ingestion -.->|Publishes Event| Kafka
+    Kafka -.->|Consumes Event| FastAPI
+    FastAPI -.->|Emits AI Result| Kafka
+
+    %% Telemetry Flow
+    Perimeter -.->|Traces & Metrics| Prometheus
+    Services -.->|Traces & Metrics| Prometheus
+    Intelligence -.->|Traces & Metrics| Prometheus
+
+```
 
 ---
 
