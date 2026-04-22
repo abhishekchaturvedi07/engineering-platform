@@ -170,10 +170,8 @@ All deployable repositories linked above adhere to the following platform standa
 
 This platform operates on a strict microservice architecture. To ensure independent CI/CD lifecycles, strict decoupling, and domain isolation, the code is split across the following dedicated repositories:
 
-```text
-@abhishekchaturvedi07/
-├── 🏗️ engineering-platform/    # (You are here) Architecture, System Design, and IDP Docs
-├── 💻 platform-portal-app/     # Next.js Frontend UI & GraphQL BFF layer
-├── 🔐 identity-service/        # Node.js IAM, JWT Auth, and PostgreSQL write database
-└── 🧠 ai-orchestrator/         # Python/FastAPI LangGraph Agent & Vector processing
-```
+- 🏢 **[@abhishekchaturvedi07/](https://github.com/abhishekchaturvedi07)** _(GitHub Organization / User)_
+  - 🏗️ [**engineering-platform**](https://github.com/abhishekchaturvedi07/engineering-platform) — _(You are here)_ Architecture, System Design, and IDP Docs.
+  - 💻 [**platform-portal-app**](https://github.com/abhishekchaturvedi07/platform-portal-app) — Next.js Frontend UI & GraphQL BFF layer.
+  - 🔐 [**identity-service**](https://github.com/abhishekchaturvedi07/identity-service) — Node.js IAM, JWT Auth, and PostgreSQL database.
+  - 🧠 [**ai-orchestrator**](https://github.com/abhishekchaturvedi07/ai-orchestrator) — Python/FastAPI LangGraph Agent & Vector processing.
