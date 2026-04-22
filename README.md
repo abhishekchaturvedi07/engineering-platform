@@ -163,3 +163,17 @@ All deployable repositories linked above adhere to the following platform standa
 1. **Containerization:** All services include a `Dockerfile`.
 2. **CI/CD:** Automated testing and linting via GitHub Actions.
 3. **Commit Convention:** Strict adherence to Conventional Commits (e.g., `feat:`, `fix:`, `chore:`).
+
+---
+
+## 🌍 Enterprise System Landscape (Code Repositories)
+
+This platform operates on a strict microservice architecture. To ensure independent CI/CD lifecycles, strict decoupling, and domain isolation, the code is split across the following dedicated repositories:
+
+```text
+@abhishekchaturvedi07/
+├── 🏗️ engineering-platform/    # (You are here) Architecture, System Design, and IDP Docs
+├── 💻 platform-portal-app/     # Next.js Frontend UI & GraphQL BFF layer
+├── 🔐 identity-service/        # Node.js IAM, JWT Auth, and PostgreSQL write database
+└── 🧠 ai-orchestrator/         # Python/FastAPI LangGraph Agent & Vector processing
+```
