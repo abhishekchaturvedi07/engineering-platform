@@ -1,43 +1,37 @@
 # 🏛️ Enterprise System Blueprint & Data Flow
 
-This document outlines the high-level architectural patterns, data flow, and boundaries for the platform. The system is designed for high availability, strict domain isolation, and agentic AI processing.
+This document outlines the high-level architectural patterns, data flow, and strict domain boundaries for the platform. It is designed for enterprise scale, incorporating resilience patterns, CQRS, and strict security perimeters.
 
 ## 1. Core Architectural Decisions
 
-### A. API Entry: The Gateway + BFF Pattern
+### A. Edge & API Layer
 
-- **API Gateway (Edge):** Acts as the perimeter defense. Handles SSL termination, rate limiting, and initial JWT validation.
-- **GraphQL BFF (Backend-For-Frontend):** Sits behind the gateway. It stitches together multiple REST responses from downstream microservices into a single, cohesive GraphQL graph for the Next.js frontend to consume efficiently.
+- **CDN & WAF:** Cloudflare/AWS CloudFront handles static asset caching and Web Application Firewall (WAF) rules before traffic ever hits the servers.
+- **API Gateway:** A dedicated layer for SSL termination, IP filtering, and OAuth2/JWT validation.
+- **GraphQL BFF:** Sits securely behind the gateway, stitching together data for the Next.js frontend to prevent over-fetching.
 
-### B. Microservice Communication: Sync + Async Hybrid
+### B. Microservice Communication & Resilience
 
-- **External to Internal (Synchronous):** The frontend communicates with the Gateway/BFF via REST/GraphQL over HTTPS.
-- **Internal Service-to-Service (Asynchronous):** Decoupled internal communication is handled via an Event Broker (**Kafka / RabbitMQ**). Services emit domain events (e.g., `UserCreated`, `DocumentUploaded`) rather than calling each other directly, preventing cascading timeouts.
+- **External (Sync):** Client to Gateway/BFF uses REST and GraphQL over HTTPS.
+- **Internal (Sync):** Service-to-Service synchronous communication utilizes **gRPC** with Protocol Buffers for high-performance, strongly-typed contracts.
+- **Resilience Patterns:** All synchronous internal calls are wrapped in **Circuit Breakers** to prevent cascading failures if a downstream service degrades.
+- **Internal (Async):** A Kafka/RabbitMQ event broker handles decoupled workflows. Includes a **Dead Letter Queue (DLQ)** for failed message processing.
 
-### C. Data Strategy: Database-per-Service
+### C. Data Strategy & CQRS
 
-To ensure strict boundary contexts, no two microservices share a database.
-
-- **Identity Service:** PostgreSQL (Relational mapping for users/roles).
-- **Data Ingestion Service:** MongoDB (Flexible schema for raw payloads).
-- **AI Intelligence Service:** Pinecone / Milvus (Vector embeddings).
+- **Database-per-Service:** No shared databases. Identity uses PostgreSQL; Ingestion uses MongoDB.
+- **CQRS (Command Query Responsibility Segregation):** Write operations (Commands) are processed and stored in primary databases. Read operations (Queries) are served primarily from **Redis**, which sits aggressively in front of all databases to handle high-throughput reads.
+- **Secrets Management:** HashiCorp Vault / AWS Secrets Manager centrally manages all DB credentials and AI API keys.
 
 ### D. AI Integration: Agentic Orchestration
 
-- **Orchestrator:** A dedicated **FastAPI** service powered by **LangChain & LangGraph**.
-- **Behavior:** Instead of embedding AI sequentially into Node.js, the AI service operates as an asynchronous agent. It listens for system events, executes cyclic reasoning (LangGraph), accesses vector storage, and emits a completion event back to the broker.
+- **Orchestrator:** A FastAPI service powered by **LangGraph** operates as an asynchronous agent.
+- **Guardrails:** Inputs and outputs pass through a security layer to check for PII and hallucination bounding before interacting with the Pinecone Vector DB.
 
-### E. Caching Strategy: Multi-Tiered
+### E. DevOps & Observability
 
-- **Edge Caching:** Next.js caches static pages and platform shells (CDN level).
-- **Gateway Rate Limiting:** The API Gateway uses **Redis** to track IP/Token request rates.
-- **Data Caching:** The BFF and internal microservices use **Redis** to cache expensive database queries and AI generation results, minimizing latency and compute costs.
-
-### F. Observability & Alerting (The Telemetry Layer)
-
-- **Distributed Tracing:** **OpenTelemetry** is injected into every service, attaching a unique `trace_id` to every request from the Next.js client all the way down to the AI vector search.
-- **Metrics & Monitoring:** Services expose `/metrics` endpoints scraped by **Prometheus**. **Grafana** dashboards visualize service health, queue depths, and cache hit rates.
-- **Alerting:** Prometheus Alertmanager watches for anomalies (e.g., Kafka queue backing up, high 500-error rates) and routes alerts to developer channels (Slack/PagerDuty).
+- **CI/CD:** Automated pipelines (GitHub Actions) handle testing, containerization (Docker), and deployment.
+- **Telemetry:** OpenTelemetry injects trace IDs. Logs are aggregated via ELK/Datadog, and metrics are scraped by Prometheus/Grafana.
 
 ---
 
@@ -52,34 +46,46 @@ flowchart TB
     classDef data fill:#fff3e0,stroke:#e65100,stroke-width:1px;
     classDef broker fill:#fce4ec,stroke:#880e4f,stroke-width:2px,stroke-dasharray: 5 5;
     classDef ai fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef sec fill:#ffebee,stroke:#b71c1c,stroke-width:2px;
     classDef ops fill:#eceff1,stroke:#455a64,stroke-width:2px,stroke-dasharray: 3 3;
 
-    Client([Next.js Web Client]):::client
+    Client([Clients: Web / Mobile]):::client
 
-    subgraph Perimeter ["🛡️ Edge & API Entry"]
+    subgraph EdgeLayer ["🌐 Edge & Security Perimeter"]
         direction TB
-        Gateway["API Gateway<br/>(Rate Limit / Auth)"]:::edge
+        CDN["CDN & WAF"]:::edge
+        Gateway["API Gateway<br/>(Auth / Rate Limits)"]:::edge
         BFF["GraphQL BFF<br/>(Data Stitching)"]:::edge
-        Gateway -->|REST| BFF
+        CDN --> Gateway --> BFF
     end
 
-    subgraph Services ["⚙️ Core Microservices"]
+    subgraph Services ["⚙️ Core Microservices (CQRS)"]
         direction TB
-        Identity["Identity & IAM Service"]:::service
+        Identity["Identity Service"]:::service
         Ingestion["Data Ingestion Service"]:::service
 
-        Redis[(Redis Cache)]:::data
-        DB_ID[(PostgreSQL)]:::data
-        DB_Ingest[(MongoDB)]:::data
+        Cache[(Redis Read Cache)]:::data
+        DB_ID[(PostgreSQL - Writes)]:::data
+        DB_Ingest[(MongoDB - Writes)]:::data
 
+        BFF -.->|Query Hit| Cache
         Identity --- DB_ID
         Ingestion --- DB_Ingest
-        BFF -.->|Cache Hit| Redis
-        Gateway -.->|Rate Limiting| Redis
+        Identity -.->|Cache Update| Cache
+        Ingestion -.->|Cache Update| Cache
+    end
+
+    subgraph Infrastructure ["🔒 Security & Ops"]
+        direction LR
+        Vault["Secrets Manager<br/>(Vault)"]:::sec
+        CICD["CI/CD Pipeline<br/>(Docker / GitOps)"]:::ops
     end
 
     subgraph EventMesh ["⚡ Event-Driven Backbone"]
-        Kafka{{"Kafka / RabbitMQ Broker"}}:::broker
+        direction LR
+        Kafka{{"Event Broker<br/>(Kafka/RabbitMQ)"}}:::broker
+        DLQ[["Dead Letter Queue (DLQ)"]]:::broker
+        Kafka -.->|Failed Events| DLQ
     end
 
     subgraph Intelligence ["🧠 AI Domain"]
@@ -89,25 +95,26 @@ flowchart TB
         FastAPI --- Vector
     end
 
-    subgraph Ops ["🔍 Observability & Alerting"]
-        Prometheus[Prometheus / OpenTelemetry]:::ops
-        Grafana[Grafana Dashboards]:::ops
-        Prometheus --- Grafana
+    subgraph Telemetry ["🔍 Observability"]
+        direction LR
+        Otel["OpenTelemetry<br/>(Tracing)"]:::ops
+        Grafana["Prometheus / Grafana"]:::ops
     end
 
     %% Routing Flow
-    Client ==>|HTTPS / WAF| Gateway
-    BFF ==>|REST| Identity
-    BFF ==>|REST| Ingestion
+    Client ==>|HTTPS| CDN
+    BFF ==>|gRPC + Circuit Breaker| Identity
+    BFF ==>|gRPC + Circuit Breaker| Ingestion
 
     %% Async Flow
-    Identity -.->|Publishes Event| Kafka
-    Ingestion -.->|Publishes Event| Kafka
-    Kafka -.->|Consumes Event| FastAPI
-    FastAPI -.->|Emits AI Result| Kafka
+    Identity -.->|Publish Event| Kafka
+    Ingestion -.->|Publish Event| Kafka
+    Kafka -.->|Consume Event| FastAPI
+    FastAPI -.->|Emit Result| Kafka
 
-    %% Telemetry Flow
-    Perimeter -.->|Traces & Metrics| Prometheus
-    Services -.->|Traces & Metrics| Prometheus
-    Intelligence -.->|Traces & Metrics| Prometheus
+    %% Global Connections
+    Services -.->|Fetch Keys| Vault
+    Intelligence -.->|Fetch Keys| Vault
+    Services -.->|Traces| Otel
+    Intelligence -.->|Traces| Otel
 ```

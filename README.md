@@ -8,41 +8,53 @@ Welcome to the central Engineering Platform. This repository serves as the Inter
 
 ```mermaid
 flowchart TB
-    %% Styling
+    %% Styling Definitions
     classDef client fill:#ffffff,stroke:#333,stroke-width:2px;
     classDef edge fill:#e0f7fa,stroke:#006064,stroke-width:2px;
     classDef service fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px;
     classDef data fill:#fff3e0,stroke:#e65100,stroke-width:1px;
     classDef broker fill:#fce4ec,stroke:#880e4f,stroke-width:2px,stroke-dasharray: 5 5;
     classDef ai fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef sec fill:#ffebee,stroke:#b71c1c,stroke-width:2px;
     classDef ops fill:#eceff1,stroke:#455a64,stroke-width:2px,stroke-dasharray: 3 3;
 
-    Client([Next.js Web Client]):::client
+    Client([Clients: Web / Mobile]):::client
 
-    subgraph Perimeter ["🛡️ Edge & API Entry"]
+    subgraph EdgeLayer ["🌐 Edge & Security Perimeter"]
         direction TB
-        Gateway["API Gateway<br/>(Rate Limit / Auth)"]:::edge
+        CDN["CDN & WAF"]:::edge
+        Gateway["API Gateway<br/>(Auth / Rate Limits)"]:::edge
         BFF["GraphQL BFF<br/>(Data Stitching)"]:::edge
-        Gateway -->|REST| BFF
+        CDN --> Gateway --> BFF
     end
 
-    subgraph Services ["⚙️ Core Microservices"]
+    subgraph Services ["⚙️ Core Microservices (CQRS)"]
         direction TB
-        Identity["Identity & IAM Service"]:::service
+        Identity["Identity Service"]:::service
         Ingestion["Data Ingestion Service"]:::service
 
-        Redis[(Redis Cache)]:::data
-        DB_ID[(PostgreSQL)]:::data
-        DB_Ingest[(MongoDB)]:::data
+        Cache[(Redis Read Cache)]:::data
+        DB_ID[(PostgreSQL - Writes)]:::data
+        DB_Ingest[(MongoDB - Writes)]:::data
 
+        BFF -.->|Query Hit| Cache
         Identity --- DB_ID
         Ingestion --- DB_Ingest
-        BFF -.->|Cache Hit| Redis
-        Gateway -.->|Rate Limiting| Redis
+        Identity -.->|Cache Update| Cache
+        Ingestion -.->|Cache Update| Cache
+    end
+
+    subgraph Infrastructure ["🔒 Security & Ops"]
+        direction LR
+        Vault["Secrets Manager<br/>(Vault)"]:::sec
+        CICD["CI/CD Pipeline<br/>(Docker / GitOps)"]:::ops
     end
 
     subgraph EventMesh ["⚡ Event-Driven Backbone"]
-        Kafka{{"Kafka / RabbitMQ Broker"}}:::broker
+        direction LR
+        Kafka{{"Event Broker<br/>(Kafka/RabbitMQ)"}}:::broker
+        DLQ[["Dead Letter Queue (DLQ)"]]:::broker
+        Kafka -.->|Failed Events| DLQ
     end
 
     subgraph Intelligence ["🧠 AI Domain"]
@@ -52,28 +64,28 @@ flowchart TB
         FastAPI --- Vector
     end
 
-    subgraph Ops ["🔍 Observability & Alerting"]
-        Prometheus[Prometheus / OpenTelemetry]:::ops
-        Grafana[Grafana Dashboards]:::ops
-        Prometheus --- Grafana
+    subgraph Telemetry ["🔍 Observability"]
+        direction LR
+        Otel["OpenTelemetry<br/>(Tracing)"]:::ops
+        Grafana["Prometheus / Grafana"]:::ops
     end
 
     %% Routing Flow
-    Client ==>|HTTPS / WAF| Gateway
-    BFF ==>|REST| Identity
-    BFF ==>|REST| Ingestion
+    Client ==>|HTTPS| CDN
+    BFF ==>|gRPC + Circuit Breaker| Identity
+    BFF ==>|gRPC + Circuit Breaker| Ingestion
 
     %% Async Flow
-    Identity -.->|Publishes Event| Kafka
-    Ingestion -.->|Publishes Event| Kafka
-    Kafka -.->|Consumes Event| FastAPI
-    FastAPI -.->|Emits AI Result| Kafka
+    Identity -.->|Publish Event| Kafka
+    Ingestion -.->|Publish Event| Kafka
+    Kafka -.->|Consume Event| FastAPI
+    FastAPI -.->|Emit Result| Kafka
 
-    %% Telemetry Flow
-    Perimeter -.->|Traces & Metrics| Prometheus
-    Services -.->|Traces & Metrics| Prometheus
-    Intelligence -.->|Traces & Metrics| Prometheus
-
+    %% Global Connections
+    Services -.->|Fetch Keys| Vault
+    Intelligence -.->|Fetch Keys| Vault
+    Services -.->|Traces| Otel
+    Intelligence -.->|Traces| Otel
 ```
 
 ---
