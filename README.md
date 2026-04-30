@@ -175,3 +175,4 @@ This platform operates on a strict microservice architecture. To ensure independ
   - 💻 [**platform-portal-app**](https://github.com/abhishekchaturvedi07/platform-portal-app) — Next.js Frontend UI & GraphQL BFF layer.
   - 🔐 [**identity-service**](https://github.com/abhishekchaturvedi07/identity-service) — Node.js IAM, JWT Auth, and PostgreSQL database.
   - 🧠 [**ai-orchestrator**](https://github.com/abhishekchaturvedi07/ai-orchestrator) — Python/FastAPI LangGraph Agent & Vector processing.
+  - 🔍 [**platform-telemetry**](https://github.com/abhishekchaturvedi07/platform-telemetry) — Infrastructure-as-code for Prometheus metric scraping and Grafana dashboards.
