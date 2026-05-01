@@ -128,6 +128,27 @@ _Backend microservices ranging from API gateways to data ingestion._
 
 _AI pipelines spanning foundational ML to autonomous agentic systems._
 
+```mermaid
+graph TD
+    classDef ai fill:#8e44ad,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef database fill:#ea4335,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef external fill:#2c3e50,stroke:#fff,stroke-width:2px,color:#fff;
+
+    Input(("User Query")) --> Router{"Hybrid Semantic Router<br/>(Heuristics + LLM)"}:::ai
+
+    Router -->|'DATABASE'| Retriever["ChromaDB Retriever"]:::ai
+    Retriever <--> Chroma[("Local Vector DB")]:::database
+
+    Router -->|'INTERNET'| WebSearch["DuckDuckGo Search"]:::ai
+    WebSearch <--> ExternalWeb(("Live Internet")):::external
+
+    Router -->|'GENERAL'| LLM["General Conversation"]:::ai
+
+    Retriever --> Generator["Response Generator"]:::ai
+    WebSearch --> Generator
+    LLM --> Generator
+```
+
 - **Foundational ML & NLP**
   - [Text Classification & Sentiment API](domains/intelligence/foundational/nlp-service.md)
 - **Generative AI & LLM Pipelines**
